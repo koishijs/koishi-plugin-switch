@@ -1,6 +1,6 @@
 commands:
   switch:
-    description: 启用和禁用指令
+    description: Activer et désactiver les commandes
     messages:
       forbidden: 您无权修改 {0} 功能。
       list: 当前禁用的功能有：{0}
