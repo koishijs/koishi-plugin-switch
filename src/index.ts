@@ -1,5 +1,5 @@
 import { Argv, Context, deduplicate, difference, intersection, Schema } from 'koishi'
-import { adminChannel } from '@koishijs/helpers'
+import {} from '@koishijs/plugin-admin'
 
 declare module 'koishi' {
   namespace Command {
@@ -48,10 +48,9 @@ export function apply(ctx: Context, config: Config = {}) {
     }
   })
 
-  ctx.command('switch <command...>', '启用和禁用功能', { authority: 3 })
+  ctx.command('switch <command...>', '启用和禁用功能', { authority: 3, admin: { channel: true } })
     .channelFields(['disable'])
     .userFields(['authority'])
-    .use(adminChannel)
     .action(async ({ session }, ...names: string[]) => {
       const channel = session.channel
       if (!names.length) {
@@ -62,7 +61,7 @@ export function apply(ctx: Context, config: Config = {}) {
       names = deduplicate(names)
       const forbidden = names.filter((name) => {
         const command = ctx.$commander._commands.get(name)
-        return command && command.config.authority >= session.user.authority
+        return command && session.resolve(command.config.authority) >= session.user.authority
       })
       if (forbidden.length) return session.text('.forbidden', [forbidden.join(', ')])
 
