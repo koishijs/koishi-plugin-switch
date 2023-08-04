@@ -2,6 +2,6 @@ commands:
   switch:
     description: Enable and Disable Commands
     messages:
-      forbidden: 您无权修改 {0} 功能。
-      list: 当前禁用的功能有：{0}
-      none: 当前没有禁用功能。
+      forbidden: You do not have permission to modify {0} feature.
+      list: 'Current disabled features are: {0}'
+      none: There are no disabled features currently.
