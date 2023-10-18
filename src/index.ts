@@ -4,8 +4,7 @@ import {} from '@koishijs/plugin-admin'
 declare module 'koishi' {
   namespace Command {
     interface Config {
-      disabled?: boolean
-      userTriggerDisabled?: boolean
+      userCall?: 'enabled' | 'disabled' | 'aliasOnly'
     }
   }
 
@@ -25,7 +24,11 @@ export function apply(ctx: Context, config: Config = {}) {
   ctx.i18n.define('zh', require('./locales/zh-CN'))
 
   ctx.schema.extend('command', Schema.object({
-    userTriggerDisabled: Schema.boolean().description('禁止用户触发').default(false),
+    userCall: Schema.union([
+      Schema.const('enabled').description('允许用户调用'),
+      Schema.const('disabled').description('禁止用户调用'),
+      Schema.const('aliasOnly').description('仅允许用户使用别名调用'),
+    ]).role('radio').description('用户调用方式。').default('enabled'),
   }), 900)
 
   ctx.model.extend('channel', {
@@ -44,12 +47,12 @@ export function apply(ctx: Context, config: Config = {}) {
     let command = session.argv?.command
     const { enable = [], disable = [] } = session.channel || {}
     while (command) {
-      if (command.config.userTriggerDisabled && session.argv.root) {
-        session.response = noop
+      if (command.config.userCall === 'disabled') {
+        if (!enable.includes(command.name)) session.response = noop
         return
-      } else if (command.config.disabled) {
-        if (enable.includes(command.name)) return
-        session.response = noop
+      } else if (command.config.userCall === 'aliasOnly') {
+        const [name] = session.stripped.content.slice(session.stripped.prefix.length).split(' ', 1)
+        if (name === command.name) session.response = noop
         return
       } else if (disable.includes(command.name)) {
         session.response = noop
@@ -62,12 +65,16 @@ export function apply(ctx: Context, config: Config = {}) {
   ctx.command('switch <command...>', '启用和禁用功能', { authority: 3, admin: { channel: true } })
     .channelFields(['disable'])
     .userFields(['authority'])
-    .action(async ({ session }, ...names: string[]) => {
+    .option('enable', '-e')
+    .option('disable', '-d')
+    .action(async ({ session, options }, ...names: string[]) => {
       const channel = session.channel
       if (!names.length) {
         if (!channel.disable.length) return session.text('.none')
         return session.text('.list', [channel.disable.join(', ')])
       }
+
+      if (options.enable && options.disable) return session.text('.conflict')
 
       names = deduplicate(names)
       const forbidden = names.filter((name) => {
@@ -76,9 +83,11 @@ export function apply(ctx: Context, config: Config = {}) {
       })
       if (forbidden.length) return session.text('.forbidden', [forbidden.join(', ')])
 
-      const add = difference(names, channel.disable)
-      const remove = intersection(names, channel.disable)
+      const add = options.enable ? [] : difference(names, channel.disable)
+      const remove = options.disable ? [] : intersection(names, channel.disable)
       const preserve = difference(channel.disable, names)
+      if (!add.length && !remove.length) return session.text('.unchanged')
+
       const output: string[] = []
       if (add.length) output.push(`禁用 ${add.join(', ')} 功能`)
       if (remove.length) output.push(`启用 ${remove.join(', ')} 功能`)
