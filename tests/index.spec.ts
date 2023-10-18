@@ -1,5 +1,6 @@
 import { App } from 'koishi'
 import * as _switch from '../src'
+import admin from '@koishijs/plugin-admin'
 import memory from '@koishijs/plugin-database-memory'
 import mock from '@koishijs/plugin-mock'
 
@@ -7,12 +8,14 @@ const app = new App()
 
 app.plugin(memory)
 app.plugin(mock)
+app.plugin(admin)
 
 const client = app.mock.client('123', '321')
 
 app.plugin(_switch)
 app.command('foo', { authority: 4 })
 app.command('baz').action(() => 'zab')
+app.command('bar').option('x', '-x <x>', { type: () => { throw Error('') } })
 
 before(async () => {
   await app.start()
@@ -30,5 +33,7 @@ describe('koishi-plugin-switch', () => {
     await client.shouldReply('switch baz', '已启用 baz 功能。')
     await client.shouldReply('baz', 'zab')
     await client.shouldReply('switch foo', '您无权修改 foo 功能。')
+    await client.shouldReply('switch bar', '已禁用 bar 功能。')
+    await client.shouldNotReply('bar -x 1')
   })
 })
