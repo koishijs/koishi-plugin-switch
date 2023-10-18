@@ -1,10 +1,11 @@
-import { Argv, Context, deduplicate, difference, intersection, Schema } from 'koishi'
+import { Context, deduplicate, difference, intersection, noop, Schema, Session } from 'koishi'
 import {} from '@koishijs/plugin-admin'
 
 declare module 'koishi' {
   namespace Command {
     interface Config {
       disabled?: boolean
+      userTriggerDisabled?: boolean
     }
   }
 
@@ -23,6 +24,10 @@ export const Config: Schema<Config> = Schema.object({})
 export function apply(ctx: Context, config: Config = {}) {
   ctx.i18n.define('zh', require('./locales/zh-CN'))
 
+  ctx.schema.extend('command', Schema.object({
+    userTriggerDisabled: Schema.boolean().description('禁止用户触发').default(false),
+  }), 900)
+
   ctx.model.extend('channel', {
     // enable: 'list',
     disable: 'list',
@@ -35,16 +40,22 @@ export function apply(ctx: Context, config: Config = {}) {
   })
 
   // check channel
-  ctx.before('command/execute', ({ session, command }: Argv<never, 'enable' | 'disable'>) => {
+  ctx.on('attach', (session: Session<never, 'enable' | 'disable'>) => {
+    let command = session.argv?.command
     const { enable = [], disable = [] } = session.channel || {}
     while (command) {
-      if (command.config.disabled) {
-        if (enable.includes(command.name)) return null
-        return ''
-      } else {
-        if (disable.includes(command.name)) return ''
-        command = command.parent as any
+      if (command.config.userTriggerDisabled && session.argv.root) {
+        session.response = noop
+        return
+      } else if (command.config.disabled) {
+        if (enable.includes(command.name)) return
+        session.response = noop
+        return
+      } else if (disable.includes(command.name)) {
+        session.response = noop
+        return
       }
+      command = command.parent as any
     }
   })
 
