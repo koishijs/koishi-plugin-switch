@@ -51,7 +51,7 @@ export function apply(ctx: Context, config: Config = {}) {
         if (!enable.includes(command.name)) session.response = noop
         return
       } else if (command.config.userCall === 'aliasOnly') {
-        const [name] = session.stripped.content.slice(session.stripped.prefix.length).split(' ', 1)
+        const [name] = session.stripped.content.toLowerCase().slice(session.stripped.prefix.length).split(' ', 1)
         if (name === command.name) session.response = noop
         return
       } else if (disable.includes(command.name)) {
