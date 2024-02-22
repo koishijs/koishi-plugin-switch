@@ -1,0 +1,9 @@
+commands:
+  switch:
+    description: Enable and Disable Commands
+    messages:
+      forbidden: You do not have permission to modify {0} feature.
+      list: 'Current disabled features are: {0}'
+      none: There are no disabled features currently.
+      conflict: 选项冲突。
+      unchanged: 无任何更改。
