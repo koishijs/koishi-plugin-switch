@@ -4,7 +4,7 @@ import {} from '@koishijs/plugin-admin'
 declare module 'koishi' {
   namespace Command {
     interface Config {
-      userCall?: 'enabled' | 'disabled' | 'aliasOnly'
+      userCall?: 'enabled' | 'disabled' | 'aliasOnly' | 'aliasOrAppel'
     }
   }
 
@@ -28,6 +28,7 @@ export function apply(ctx: Context, config: Config = {}) {
       Schema.const('enabled').description('允许用户调用'),
       Schema.const('disabled').description('禁止用户调用'),
       Schema.const('aliasOnly').description('仅允许用户使用别名调用'),
+      Schema.const('aliasOrAppel').description('允许用户使用别名或称呼调用'),
     ]).role('radio').description('用户调用方式。').default('enabled'),
   }), 900)
 
@@ -54,6 +55,10 @@ export function apply(ctx: Context, config: Config = {}) {
         const [name] = session.stripped.content.toLowerCase().slice(session.stripped.prefix.length).split(' ', 1)
         if (name === command.name) session.response = noop
         return
+      } else if (command.config.userCall === 'aliasOrAppel') {
+        const [name] = session.stripped.content.toLowerCase().slice(session.stripped.prefix.length).split(' ', 1)
+        if (name === command.name && !session.stripped.appel) session.response = noop
+        return
       } else if (disable.includes(command.name)) {
         session.response = noop
         return
@@ -78,7 +83,7 @@ export function apply(ctx: Context, config: Config = {}) {
 
       names = deduplicate(names)
       const forbidden = names.filter((name) => {
-        const command = ctx.$commander._commands.get(name)
+        const command = ctx.$commander.get(name)
         return command && session.resolve(command.config.authority) >= session.user.authority
       })
       if (forbidden.length) return session.text('.forbidden', [forbidden.join(', ')])
