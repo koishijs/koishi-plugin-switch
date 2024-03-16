@@ -1,6 +1,6 @@
 {
   "name": "@hieuzest/koishi-plugin-switch",
-  "version": "1.3.2",
+  "version": "1.4.0",
   "description": "Switch Command Contexts in Koishi",
   "main": "lib/index.js",
   "typings": "lib/index.d.ts",
@@ -50,28 +50,28 @@
   },
   "devDependencies": {
     "@koishijs/plugin-admin": "^2.0.0-beta.4",
-    "@koishijs/plugin-database-memory": "^2.6.0",
+    "@koishijs/plugin-database-memory": "^3.0.0",
     "@koishijs/plugin-help": "^2.4.3",
     "@koishijs/plugin-mock": "^2.6.5",
     "@types/chai": "^4.3.12",
     "@types/chai-as-promised": "^7.1.8",
-    "@types/mocha": "^9.1.1",
-    "@types/node": "^18.19.18",
-    "atsc": "^1.2.2",
-    "c8": "^7.14.0",
-    "chai": "^4.4.1",
+    "@types/mocha": "^10.0.6",
+    "@types/node": "^20.11.28",
+    "atsc": "^2.0.1",
+    "c8": "^9.1.0",
+    "chai": "^5.1.0",
     "chai-as-promised": "^7.1.1",
     "chai-shape": "^1.0.0",
-    "esbuild": "^0.18.20",
+    "esbuild": "^0.20.2",
     "esbuild-register": "^3.5.0",
-    "jest-mock": "^28.1.3",
-    "koishi": "^4.17.1",
-    "mocha": "^9.2.2",
+    "jest-mock": "^29.7.0",
+    "koishi": "^4.17.2",
+    "mocha": "^10.3.0",
     "shx": "^0.3.4",
     "typescript": "^5.5.0-dev.20240224",
     "yml-register": "^1.2.5"
   },
   "peerDependencies": {
-    "koishi": "^4.17.1"
+    "koishi": "^4.16.1"
   }
 }

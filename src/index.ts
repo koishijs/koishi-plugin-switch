@@ -1,4 +1,4 @@
-import { Context, deduplicate, difference, intersection, noop, Schema, Session } from 'koishi'
+import { Context, deduplicate, noop, Schema, Session } from 'koishi'
 import {} from '@koishijs/plugin-admin'
 
 declare module 'koishi' {
@@ -29,17 +29,17 @@ export function apply(ctx: Context, config: Config = {}) {
       Schema.const('disabled').description('禁止用户调用'),
       Schema.const('aliasOnly').description('仅允许用户使用别名调用'),
       Schema.const('aliasOrAppel').description('允许用户使用别名或称呼调用'),
-    ]).role('radio').description('用户调用方式。').default('enabled'),
+    ]).role('radio').description('默认用户调用方式。').default('enabled'),
   }), 900)
 
   ctx.model.extend('channel', {
-    // enable: 'list',
+    enable: 'list',
     disable: 'list',
   })
 
   ctx.before('attach-channel', (session, fields) => {
     if (!session.argv) return
-    // fields.add('enable')
+    fields.add('enable')
     fields.add('disable')
   })
 
@@ -51,6 +51,9 @@ export function apply(ctx: Context, config: Config = {}) {
       if (command.config.userCall === 'disabled') {
         if (!enable.includes(command.name)) session.response = noop
         return
+      } else if (disable.includes(command.name)) {
+        session.response = noop
+        return
       } else if (command.config.userCall === 'aliasOnly') {
         const [name] = session.stripped.content.toLowerCase().slice(session.stripped.prefix.length).split(' ', 1)
         if (name === command.name) session.response = noop
@@ -59,45 +62,86 @@ export function apply(ctx: Context, config: Config = {}) {
         const [name] = session.stripped.content.toLowerCase().slice(session.stripped.prefix.length).split(' ', 1)
         if (name === command.name && !session.stripped.appel) session.response = noop
         return
-      } else if (disable.includes(command.name)) {
-        session.response = noop
-        return
       }
       command = command.parent as any
     }
   })
 
   ctx.command('switch <command...>', '启用和禁用功能', { authority: 3, admin: { channel: true } })
-    .channelFields(['disable'])
+    .channelFields(['enable', 'disable'])
     .userFields(['authority'])
     .option('enable', '-e')
     .option('disable', '-d')
+    .option('reset', '-r')
+    .option('resetAll', '-R')
     .action(async ({ session, options }, ...names: string[]) => {
       const channel = session.channel
+      if (+!!options.enable + +!!options.disable + +!!options.reset + +!!options.resetAll > 1) return session.text('.conflict')
+
       if (!names.length) {
-        if (!channel.disable.length) return session.text('.none')
-        return session.text('.list', [channel.disable.join(', ')])
+        if (options.resetAll) {
+          channel.enable = []
+          channel.disable = []
+          await channel.$update()
+          return session.text('.reset')
+        }
+
+        const output = []
+        if (!options.disable && channel.enable.length) output.push(session.text('.list-enabled', [channel.enable.join(', ')]))
+        if (!options.enable && channel.disable.length) output.push(session.text('.list-disabled', [channel.disable.join(', ')]))
+        if (options.reset && output.length) output.push(session.text('.reset-ready'))
+        return output.length ? output.join('\n') : session.text('.none')
       }
 
-      if (options.enable && options.disable) return session.text('.conflict')
-
       names = deduplicate(names)
-      const forbidden = names.filter((name) => {
-        const command = ctx.$commander.get(name)
-        return command && session.resolve(command.config.authority) >= session.user.authority
-      })
-      if (forbidden.length) return session.text('.forbidden', [forbidden.join(', ')])
+      const isEnabled = (name, initial) => {
+        if (initial) return !channel.disable.includes(name)
+        else return channel.enable.includes(name)
+      }
 
-      const add = options.enable ? [] : difference(names, channel.disable)
-      const remove = options.disable ? [] : intersection(names, channel.disable)
-      const preserve = difference(channel.disable, names)
-      if (!add.length && !remove.length) return session.text('.unchanged')
+      const forbidden = [], enable = [], disable = []
+      const enableMap = Object.fromEntries(channel.enable.map((name) => [name, true]))
+      const disableMap = Object.fromEntries(channel.disable.map((name) => [name, true]))
+
+      names.forEach((name) => {
+        const command = ctx.$commander.get(name)
+        if (!command || session.resolve(command.config.authority) >= session.user.authority) {
+          forbidden.push(name)
+          return
+        }
+
+        const initial = command.config.userCall !== 'disabled'
+        const current = isEnabled(name, initial)
+        if (options.reset) {
+          if (current !== initial) (initial ? enable : disable).push(name)
+          enableMap[name] = false
+          disableMap[name] = false
+        } else if (options.enable) {
+          if (disableMap[name] || (!enableMap[name] && !initial)) enable.push(name)
+          enableMap[name] = !initial
+          disableMap[name] = false
+        } else if (options.disable) {
+          if (enableMap[name] || (!disableMap[name] && initial)) disable.push(name)
+          enableMap[name] = false
+          disableMap[name] = initial
+        } else {
+          if (!current && (disableMap[name] || (!enableMap[name] && !initial))) enable.push(name)
+          if (current && (enableMap[name] || (!disableMap[name] && initial))) disable.push(name)
+          enableMap[name] = current ? false : !initial
+          disableMap[name] = current ? initial : false
+        }
+      })
+
+      if (forbidden.length) return session.text('.forbidden', [forbidden.join(', ')])
+      if (!enable.length && !disable.length) return session.text('.unchanged')
+
+      channel.enable = Object.keys(enableMap).filter((name) => enableMap[name])
+      channel.disable = Object.keys(disableMap).filter((name) => disableMap[name])
 
       const output: string[] = []
-      if (add.length) output.push(`禁用 ${add.join(', ')} 功能`)
-      if (remove.length) output.push(`启用 ${remove.join(', ')} 功能`)
-      channel.disable = [...preserve, ...add]
+      if (enable.length) output.push(session.text('.enabled', [enable.join(', ')]))
+      if (disable.length) output.push(session.text('.disabled', [disable.join(', ')]))
       await channel.$update()
-      return `已${output.join('，')}。`
+      return session.text('.output', [output.join('，')])
     })
 }
