@@ -24,17 +24,39 @@ export function apply(ctx: Context, config: Config = {}) {
   ctx.i18n.define('zh', require('./locales/zh-CN'))
 
   ctx.schema.extend('command', Schema.object({
-    userCall: Schema.union([
-      Schema.const('enabled').description('允许用户调用'),
-      Schema.const('disabled').description('禁止用户调用'),
-      Schema.const('aliasOnly').description('仅允许用户使用别名调用'),
-      Schema.const('aliasOrAppel').description('允许用户使用别名或称呼调用'),
-    ]).role('radio').description('默认用户调用方式。').default('enabled'),
+    userCall: /* Schema.computed( */
+      Schema.union([
+        Schema.const('enabled').description('允许用户调用'),
+        Schema.const('disabled').description('禁止用户调用'),
+        Schema.const('aliasOnly').description('仅允许用户使用别名调用'),
+        Schema.const('aliasOrAppel').description('允许用户使用别名或称呼调用'),
+      ]).role('radio').default('enabled')/* ,
+    ) */.description('默认用户调用方式。'),
   }), 900)
 
   ctx.model.extend('channel', {
     enable: 'list',
     disable: 'list',
+  })
+
+  ctx.permissions.define('command:(value)', {
+    depends: ({ value }) => [`switch:${value}`],
+  })
+
+  ctx.permissions.provide('switch:(value)', ({ value }, session: Partial<Session<any, 'enable' | 'disable'>>) => {
+    let command = ctx.$commander.get(value)
+    // ignore normal command execution
+    if (command?.name === session.argv?.command.name) return true
+    const { enable = [], disable = [] } = session.channel || {}
+    while (command) {
+      if (command.config.userCall === 'disabled') {
+        if (!enable.includes(command.name)) return false
+      } else if (disable.includes(command.name)) {
+        return false
+      }
+      command = command.parent as any
+    }
+    return true
   })
 
   ctx.before('attach-channel', (session, fields) => {
@@ -43,7 +65,6 @@ export function apply(ctx: Context, config: Config = {}) {
     fields.add('disable')
   })
 
-  // check channel
   ctx.on('attach', (session: Session<never, 'enable' | 'disable'>) => {
     let command = session.argv?.command
     const { enable = [], disable = [] } = session.channel || {}
@@ -94,7 +115,7 @@ export function apply(ctx: Context, config: Config = {}) {
       }
 
       names = deduplicate(names)
-      const isEnabled = (name, initial) => {
+      const isEnabled = (name: string, initial: boolean) => {
         if (initial) return !channel.disable.includes(name)
         else return channel.enable.includes(name)
       }
@@ -142,6 +163,6 @@ export function apply(ctx: Context, config: Config = {}) {
       if (enable.length) output.push(session.text('.enabled', [enable.join(', ')]))
       if (disable.length) output.push(session.text('.disabled', [disable.join(', ')]))
       await channel.$update()
-      return session.text('.output', [output.join('，')])
+      return session.text('.output', [output.join(', ')])
     })
 }

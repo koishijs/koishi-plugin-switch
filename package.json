@@ -1,12 +1,11 @@
 {
   "name": "@hieuzest/koishi-plugin-switch",
-  "version": "1.4.0",
+  "version": "1.6.0",
   "description": "Switch Command Contexts in Koishi",
-  "main": "lib/index.js",
+  "type": "module",
+  "main": "lib/index.cjs",
+  "module": "lib/index.mjs",
   "typings": "lib/index.d.ts",
-  "files": [
-    "lib"
-  ],
   "contributors": [
     "Hieuzest <girkirin@hotmail.com>",
     "Shigma <shigma10826@gmail.com>"
