@@ -8,7 +8,7 @@ commands:
       none: 当前没有启用或禁用功能。
       conflict: 选项冲突。
       unchanged: 无任何更改。
-      reset-ready: 要重置所有功能, 使用-R参数。
+      reset-ready: 要重置所有功能，使用-R参数。
       reset: 已重置所有功能。
       enabled: 启用 {0} 功能
       disabled: 禁用 {0} 功能
