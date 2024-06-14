@@ -153,16 +153,17 @@ export function apply(ctx: Context, config: Config = {}) {
         }
       })
 
-      if (forbidden.length) return session.text('.forbidden', [forbidden.join(', ')])
+      const comma = session.text('general.comma')
+      if (forbidden.length) return session.text('.forbidden', [forbidden.join(comma)])
       if (!enable.length && !disable.length) return session.text('.unchanged')
 
       channel.enable = Object.keys(enableMap).filter((name) => enableMap[name])
       channel.disable = Object.keys(disableMap).filter((name) => disableMap[name])
 
       const output: string[] = []
-      if (enable.length) output.push(session.text('.enabled', [enable.join(', ')]))
-      if (disable.length) output.push(session.text('.disabled', [disable.join(', ')]))
+      if (enable.length) output.push(session.text('.enabled', [enable.join(comma)]))
+      if (disable.length) output.push(session.text('.disabled', [disable.join(comma)]))
       await channel.$update()
-      return session.text('.output', [output.join(', ')])
+      return session.text('.output', [output.join(comma)])
     })
 }
