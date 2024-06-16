@@ -1,8 +1,8 @@
-import { App } from 'koishi'
+import { App, h } from 'koishi'
 import * as _switch from '../src'
 import admin from '@koishijs/plugin-admin'
 import memory from '@koishijs/plugin-database-memory'
-import mock from '@koishijs/plugin-mock'
+import mock, { DEFAULT_SELF_ID } from '@koishijs/plugin-mock'
 
 const app = new App()
 
@@ -17,6 +17,13 @@ app.command('foo', { authority: 4 })
 app.command('baz').action(() => 'zab')
 app.command('bar').option('x', '-x <x>', { type: () => { throw Error('') } })
 app.command('dis', { userCall: 'disabled' }).action(() => 'dis')
+
+app.command('alias', { userCall: 'aliasOnly' }).alias('alias2').action(() => 'ok')
+app.command('appel', { userCall: 'aliasOrAppel' }).alias('appel2').action(() => 'ok')
+
+app.command('parent').action(() => 'ok')
+app.command('parent.child').action(() => 'ok')
+app.command('parent.alias', { userCall: 'aliasOnly' }).alias('calias').action(() => 'ok')
 
 before(async () => {
   await app.start()
@@ -86,5 +93,37 @@ describe('koishi-plugin-switch', () => {
     await client.shouldReply('switch -r', '当前启用的功能有：dis\n当前禁用的功能有：bar\n要重置所有功能，使用-R参数。')
     await client.shouldReply('switch -R', '已重置所有功能。')
     await client.shouldReply('switch -r', '当前没有启用或禁用功能。')
+  })
+
+  it('aliasOnly', async () => {
+    await client.shouldNotReply('alias')
+    await client.shouldReply('alias2', 'ok')
+    await client.shouldReply('switch alias', '已禁用 alias 功能。')
+    await client.shouldNotReply('alias2')
+    await client.shouldReply('switch alias', '已启用 alias 功能。')
+    await client.shouldNotReply('alias')
+  })
+
+  it('aliasOrAppel', async () => {
+    await client.shouldNotReply('appel')
+    await client.shouldReply('appel2', 'ok')
+    await client.shouldReply([h.at(DEFAULT_SELF_ID), 'appel'].join(''), 'ok')
+    await client.shouldNotReply([h.at(DEFAULT_SELF_ID + 123), 'appel'].join(''))
+  })
+
+  it('inheirt', async () => {
+    await client.shouldReply('parent', 'ok')
+    await client.shouldReply('parent.child', 'ok')
+    await client.shouldNotReply('parent.alias')
+    await client.shouldReply('calias', 'ok')
+    await client.shouldReply('switch parent', '已禁用 parent 功能。')
+    await client.shouldNotReply('parent')
+    await client.shouldNotReply('parent.child')
+    await client.shouldNotReply('calias')
+    await client.shouldReply('switch parent parent.child', '已启用 parent 功能，禁用 parent.child 功能。')
+    await client.shouldReply('parent', 'ok')
+    await client.shouldNotReply('parent.child')
+    await client.shouldReply('switch -R', '已重置所有功能。')
+    await client.shouldReply('parent.child', 'ok')
   })
 })

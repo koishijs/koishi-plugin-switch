@@ -1,4 +1,5 @@
 import { Context, deduplicate, noop, Schema, Session } from 'koishi'
+import zhCN from './locales/zh-CN.yml'
 import {} from '@koishijs/plugin-admin'
 
 declare module 'koishi' {
@@ -14,14 +15,20 @@ declare module 'koishi' {
   }
 }
 
-export interface Config {}
+export interface Config {
+  whiteList?: string[]
+  blackList?: string[]
+}
 
 export const name = 'switch'
 export const using = ['database'] as const
-export const Config: Schema<Config> = Schema.object({})
+export const Config: Schema<Config> = Schema.object({
+  whiteList: Schema.array(Schema.string()).default([]),
+  blackList: Schema.array(Schema.string()).default([]),
+})
 
-export function apply(ctx: Context, config: Config = {}) {
-  ctx.i18n.define('zh', require('./locales/zh-CN'))
+export function apply(ctx: Context, config: Config) {
+  ctx.i18n.define('zh', zhCN)
 
   ctx.schema.extend('command', Schema.object({
     userCall: /* Schema.computed( */
@@ -47,6 +54,8 @@ export function apply(ctx: Context, config: Config = {}) {
     let command = ctx.$commander.get(value)
     // ignore normal command execution
     if (command?.name === session.argv?.command.name) return true
+    if (config.whiteList?.length && ctx.permissions.test(config.whiteList, session)) return true
+    if (config.blackList?.length && ctx.permissions.test(config.blackList, session)) return false
     const { enable = [], disable = [] } = session.channel || {}
     while (command) {
       if (command.config.userCall === 'disabled') {
@@ -66,6 +75,11 @@ export function apply(ctx: Context, config: Config = {}) {
   })
 
   ctx.on('attach', (session: Session<never, 'enable' | 'disable'>) => {
+    if (config.whiteList?.length && ctx.permissions.test(config.whiteList, session)) return
+    if (config.blackList?.length && ctx.permissions.test(config.blackList, session)) {
+      session.response = noop
+      return
+    }
     let command = session.argv?.command
     const { enable = [], disable = [] } = session.channel || {}
     while (command) {
@@ -78,11 +92,9 @@ export function apply(ctx: Context, config: Config = {}) {
       } else if (command.config.userCall === 'aliasOnly') {
         const [name] = session.stripped.content.toLowerCase().slice(session.stripped.prefix.length).split(' ', 1)
         if (name === command.name) session.response = noop
-        return
       } else if (command.config.userCall === 'aliasOrAppel') {
         const [name] = session.stripped.content.toLowerCase().slice(session.stripped.prefix.length).split(' ', 1)
         if (name === command.name && !session.stripped.appel) session.response = noop
-        return
       }
       command = command.parent as any
     }
