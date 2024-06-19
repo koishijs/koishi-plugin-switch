@@ -1,6 +1,7 @@
 import { App, h } from 'koishi'
 import * as _switch from '../src'
 import admin from '@koishijs/plugin-admin'
+import * as help from '@koishijs/plugin-help'
 import memory from '@koishijs/plugin-database-memory'
 import mock, { DEFAULT_SELF_ID } from '@koishijs/plugin-mock'
 
@@ -9,6 +10,7 @@ const app = new App()
 app.plugin(memory)
 app.plugin(mock)
 app.plugin(admin)
+app.plugin(help)
 
 const client = app.mock.client('123', '321')
 

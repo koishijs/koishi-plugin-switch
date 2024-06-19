@@ -53,7 +53,7 @@ export function apply(ctx: Context, config: Config) {
   ctx.permissions.provide('switch:(value)', ({ value }, session: Partial<Session<any, 'enable' | 'disable'>>) => {
     let command = ctx.$commander.get(value)
     // ignore normal command execution
-    if (command?.name === session.argv?.command.name) return true
+    if (!command || command?.name === session.argv?.command.name) return true
     if (config.whiteList?.length && ctx.permissions.test(config.whiteList, session)) return true
     if (config.blackList?.length && ctx.permissions.test(config.blackList, session)) return false
     const { enable = [], disable = [] } = session.channel || {}
@@ -63,7 +63,7 @@ export function apply(ctx: Context, config: Config) {
       } else if (disable.includes(command.name)) {
         return false
       }
-      command = command.parent as any
+      command = command.parent
     }
     return true
   })
@@ -96,7 +96,7 @@ export function apply(ctx: Context, config: Config) {
         const [name] = session.stripped.content.toLowerCase().slice(session.stripped.prefix.length).split(' ', 1)
         if (name === command.name && !session.stripped.appel) session.response = noop
       }
-      command = command.parent as any
+      command = command.parent
     }
   })
 
@@ -171,11 +171,11 @@ export function apply(ctx: Context, config: Config) {
 
       channel.enable = Object.keys(enableMap).filter((name) => enableMap[name])
       channel.disable = Object.keys(disableMap).filter((name) => disableMap[name])
+      await channel.$update()
 
       const output: string[] = []
       if (enable.length) output.push(session.text('.enabled', [enable.join(comma)]))
       if (disable.length) output.push(session.text('.disabled', [disable.join(comma)]))
-      await channel.$update()
       return session.text('.output', [output.join(comma)])
     })
 }
