@@ -18,13 +18,15 @@ declare module 'koishi' {
 export interface Config {
   whiteList?: string[]
   blackList?: string[]
+  mutuallyExclusiveGroups?: string[][]
 }
 
 export const name = 'switch'
 export const using = ['database'] as const
 export const Config: Schema<Config> = Schema.object({
-  whiteList: Schema.array(Schema.string()).default([]),
-  blackList: Schema.array(Schema.string()).default([]),
+  whiteList: Schema.array(Schema.string()).role('table').default([]),
+  blackList: Schema.array(Schema.string()).role('table').default([]),
+  mutuallyExclusiveGroups: Schema.array(Schema.array(Schema.string()).role('table')).default([]),
 })
 
 export function apply(ctx: Context, config: Config) {
@@ -100,7 +102,7 @@ export function apply(ctx: Context, config: Config) {
     }
   })
 
-  ctx.command('switch <command...>', '启用和禁用功能', { authority: 3, admin: { channel: true } })
+  ctx.command('switch <...command>', '启用和禁用功能', { authority: 3, admin: { channel: true } })
     .channelFields(['enable', 'disable'])
     .userFields(['authority'])
     .option('enable', '-e')
@@ -126,7 +128,7 @@ export function apply(ctx: Context, config: Config) {
         return output.length ? output.join('\n') : session.text('.none')
       }
 
-      names = deduplicate(names)
+      const candidates: [string, boolean | undefined][] = deduplicate(names).map(x => [x, undefined])
       const isEnabled = (name: string, initial: boolean) => {
         if (initial) return !channel.disable.includes(name)
         else return channel.enable.includes(name)
@@ -136,11 +138,12 @@ export function apply(ctx: Context, config: Config) {
       const enableMap = Object.fromEntries(channel.enable.map((name) => [name, true]))
       const disableMap = Object.fromEntries(channel.disable.map((name) => [name, true]))
 
-      names.forEach((name) => {
+      for (let i = 0; i < candidates.length; i++) {
+        const [name, pref] = candidates[i]
         const command = ctx.$commander.get(name)
         if (!command || session.resolve(command.config.authority) >= session.user.authority) {
           forbidden.push(name)
-          return
+          break
         }
 
         const initial = command.config.userCall !== 'disabled'
@@ -149,21 +152,31 @@ export function apply(ctx: Context, config: Config) {
           if (current !== initial) (initial ? enable : disable).push(name)
           enableMap[name] = false
           disableMap[name] = false
-        } else if (options.enable) {
-          if (disableMap[name] || (!enableMap[name] && !initial)) enable.push(name)
+        } else if (options.enable || pref === true) {
+          if (disableMap[name] || (!enableMap[name] && !initial)) {
+            enable.push(name)
+            config.mutuallyExclusiveGroups
+              ?.find(group => group?.includes(name))
+              ?.forEach(x => x !== name && !candidates.find(([y]) => x === y) && candidates.push([x, false]))
+          }
           enableMap[name] = !initial
           disableMap[name] = false
-        } else if (options.disable) {
+        } else if (options.disable || pref === false) {
           if (enableMap[name] || (!disableMap[name] && initial)) disable.push(name)
           enableMap[name] = false
           disableMap[name] = initial
         } else {
-          if (!current && (disableMap[name] || (!enableMap[name] && !initial))) enable.push(name)
+          if (!current && (disableMap[name] || (!enableMap[name] && !initial))) {
+            enable.push(name)
+            config.mutuallyExclusiveGroups
+              ?.find(group => group?.includes(name))
+              ?.forEach(x => x !== name && !candidates.find(([y]) => x === y) && candidates.push([x, false]))
+          }
           if (current && (enableMap[name] || (!disableMap[name] && initial))) disable.push(name)
           enableMap[name] = current ? false : !initial
           disableMap[name] = current ? initial : false
         }
-      })
+      }
 
       const comma = session.text('general.comma')
       if (forbidden.length) return session.text('.forbidden', [forbidden.join(comma)])

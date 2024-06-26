@@ -14,7 +14,11 @@ app.plugin(help)
 
 const client = app.mock.client('123', '321')
 
-app.plugin(_switch)
+app.plugin(_switch, {
+  mutuallyExclusiveGroups: [
+    ['ex1', 'ex2'],
+  ],
+})
 app.command('foo', { authority: 4 })
 app.command('baz').action(() => 'zab')
 app.command('bar').option('x', '-x <x>', { type: () => { throw Error('') } })
@@ -26,6 +30,9 @@ app.command('appel', { userCall: 'aliasOrAppel' }).alias('appel2').action(() => 
 app.command('parent').action(() => 'ok')
 app.command('parent.child').action(() => 'ok')
 app.command('parent.alias', { userCall: 'aliasOnly' }).alias('calias').action(() => 'ok')
+
+app.command('ex1').action(() => 'ok')
+app.command('ex2', { userCall: 'disabled' }).action(() => 'ok')
 
 before(async () => {
   await app.start()
@@ -127,5 +134,22 @@ describe('koishi-plugin-switch', () => {
     await client.shouldNotReply('parent.child')
     await client.shouldReply('switch -R', '已重置所有功能。')
     await client.shouldReply('parent.child', 'ok')
+  })
+
+  it('mutuallyExclusive', async () => {
+    await client.shouldReply('ex1', 'ok')
+    await client.shouldNotReply('ex2')
+    await client.shouldReply('switch ex2', '已启用 ex2 功能，禁用 ex1 功能。')
+    await client.shouldReply('ex2', 'ok')
+    await client.shouldNotReply('ex1')
+    await client.shouldReply('switch ex1', '已启用 ex1 功能，禁用 ex2 功能。')
+    await client.shouldReply('ex1', 'ok')
+    await client.shouldNotReply('ex2')
+    await client.shouldReply('switch ex1', '已禁用 ex1 功能。')
+    await client.shouldNotReply('ex1')
+    await client.shouldNotReply('ex2')
+    await client.shouldReply('switch -R', '已重置所有功能。')
+    await client.shouldReply('ex1', 'ok')
+    await client.shouldNotReply('ex2')
   })
 })

@@ -1,6 +1,6 @@
 {
   "name": "koishi-plugin-switch",
-  "version": "1.7.1",
+  "version": "1.7.2",
   "description": "Switch Command Contexts in Koishi",
   "type": "module",
   "main": "lib/index.cjs",
