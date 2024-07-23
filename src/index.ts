@@ -55,7 +55,7 @@ export function apply(ctx: Context, config: Config) {
   ctx.permissions.provide('switch:(value)', ({ value }, session: Partial<Session<any, 'enable' | 'disable'>>) => {
     let command = ctx.$commander.get(value)
     // ignore normal command execution
-    if (!command || command?.name === session.argv?.command.name) return true
+    if (!command || command?.name === session.argv?.command?.name) return true
     if (config.whiteList?.length && ctx.permissions.test(config.whiteList, session)) return true
     if (config.blackList?.length && ctx.permissions.test(config.blackList, session)) return false
     const { enable = [], disable = [] } = session.channel || {}
