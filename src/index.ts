@@ -16,17 +16,13 @@ declare module 'koishi' {
 }
 
 export interface Config {
-  whiteList?: string[]
-  blackList?: string[]
   mutuallyExclusiveGroups?: string[][]
 }
 
 export const name = 'switch'
 export const using = ['database'] as const
 export const Config: Schema<Config> = Schema.object({
-  whiteList: Schema.array(Schema.string()).role('table').default([]),
-  blackList: Schema.array(Schema.string()).role('table').default([]),
-  mutuallyExclusiveGroups: Schema.array(Schema.array(Schema.string()).role('table')).default([]),
+  mutuallyExclusiveGroups: Schema.array(Schema.array(Schema.string()).role('table')).default([]).description('互斥组'),
 })
 
 export function apply(ctx: Context, config: Config) {
@@ -56,8 +52,6 @@ export function apply(ctx: Context, config: Config) {
     let command = ctx.$commander.get(value)
     // ignore normal command execution
     if (!command || command?.name === session.argv?.command?.name) return true
-    if (config.whiteList?.length && ctx.permissions.test(config.whiteList, session)) return true
-    if (config.blackList?.length && ctx.permissions.test(config.blackList, session)) return false
     const { enable = [], disable = [] } = session.channel || {}
     while (command) {
       if (command.config.userCall === 'disabled') {
@@ -77,11 +71,6 @@ export function apply(ctx: Context, config: Config) {
   })
 
   ctx.on('attach', (session: Session<never, 'enable' | 'disable'>) => {
-    if (config.whiteList?.length && ctx.permissions.test(config.whiteList, session)) return
-    if (config.blackList?.length && ctx.permissions.test(config.blackList, session)) {
-      session.response = noop
-      return
-    }
     let command = session.argv?.command
     const { enable = [], disable = [] } = session.channel || {}
     while (command) {
