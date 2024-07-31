@@ -49,6 +49,7 @@ export function apply(ctx: Context, config: Config) {
   })
 
   ctx.permissions.provide('switch:(value)', ({ value }, session: Partial<Session<any, 'enable' | 'disable'>>) => {
+    if (session.isDirect) return true
     let command = ctx.$commander.get(value)
     // ignore normal command execution
     if (!command || command?.name === session.argv?.command?.name) return true
@@ -71,6 +72,7 @@ export function apply(ctx: Context, config: Config) {
   })
 
   ctx.on('attach', (session: Session<never, 'enable' | 'disable'>) => {
+    if (session.isDirect) return
     let command = session.argv?.command
     const { enable = [], disable = [] } = session.channel || {}
     while (command) {
