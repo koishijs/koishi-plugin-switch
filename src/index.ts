@@ -25,6 +25,9 @@ export const Config: Schema<Config> = Schema.object({
   mutuallyExclusiveGroups: Schema.array(Schema.array(Schema.string()).role('table')).default([]).description('互斥组'),
 })
 
+const leftQuotes = `"'“‘`
+const rightQuotes = `"'”’`
+
 export function apply(ctx: Context, config: Config) {
   ctx.i18n.define('zh', zhCN)
 
@@ -83,11 +86,13 @@ export function apply(ctx: Context, config: Config) {
         session.response = noop
         return
       } else if (command.config.userCall === 'aliasOnly') {
-        const [name] = session.stripped.content.toLowerCase().slice(session.stripped.prefix.length).split(' ', 1)
-        if (name === command.name) session.response = noop
+        const [name] = session.stripped.content.toLowerCase().slice(session.stripped.prefix?.length).split(' ', 1)
+        const index = leftQuotes.indexOf(name[0]), quote = rightQuotes[index]
+        if (name === command.name || (name.at(-1) === quote && name.slice(1, -1) === command.name)) session.response = noop
       } else if (command.config.userCall === 'aliasOrAppel') {
-        const [name] = session.stripped.content.toLowerCase().slice(session.stripped.prefix.length).split(' ', 1)
-        if (name === command.name && !session.stripped.appel) session.response = noop
+        const [name] = session.stripped.content.toLowerCase().slice(session.stripped.prefix?.length).split(' ', 1)
+        const index = leftQuotes.indexOf(name[0]), quote = rightQuotes[index]
+        if ((name === command.name || (name.at(-1) === quote && name.slice(1, -1) === command.name)) && !session.stripped.appel) session.response = noop
       }
       command = command.parent
     }
@@ -101,33 +106,33 @@ export function apply(ctx: Context, config: Config) {
     .option('reset', '-r')
     .option('resetAll', '-R')
     .action(async ({ session, options }, ...names: string[]) => {
-      const channel = session.channel
+      const observed = session.channel
       if (+!!options.enable + +!!options.disable + +!!options.reset + +!!options.resetAll > 1) return session.text('.conflict')
 
       if (!names.length) {
         if (options.resetAll) {
-          channel.enable = []
-          channel.disable = []
-          await channel.$update()
+          observed.enable = []
+          observed.disable = []
+          await observed.$update()
           return session.text('.reset')
         }
 
         const output = []
-        if (!options.disable && channel.enable.length) output.push(session.text('.list-enabled', [channel.enable.join(', ')]))
-        if (!options.enable && channel.disable.length) output.push(session.text('.list-disabled', [channel.disable.join(', ')]))
+        if (!options.disable && observed.enable.length) output.push(session.text('.list-enabled', [observed.enable.join(', ')]))
+        if (!options.enable && observed.disable.length) output.push(session.text('.list-disabled', [observed.disable.join(', ')]))
         if (options.reset && output.length) output.push(session.text('.reset-ready'))
         return output.length ? output.join('\n') : session.text('.none')
       }
 
       const candidates: [string, boolean | undefined][] = deduplicate(names).map(x => [x, undefined])
       const isEnabled = (name: string, initial: boolean) => {
-        if (initial) return !channel.disable.includes(name)
-        else return channel.enable.includes(name)
+        if (initial) return !observed.disable.includes(name)
+        else return observed.enable.includes(name)
       }
 
       const forbidden = [], enable = [], disable = []
-      const enableMap = Object.fromEntries(channel.enable.map((name) => [name, true]))
-      const disableMap = Object.fromEntries(channel.disable.map((name) => [name, true]))
+      const enableMap = Object.fromEntries(observed.enable.map((name) => [name, true]))
+      const disableMap = Object.fromEntries(observed.disable.map((name) => [name, true]))
 
       for (let i = 0; i < candidates.length; i++) {
         const [name, pref] = candidates[i]
@@ -173,9 +178,9 @@ export function apply(ctx: Context, config: Config) {
       if (forbidden.length) return session.text('.forbidden', [forbidden.join(comma)])
       if (!enable.length && !disable.length) return session.text('.unchanged')
 
-      channel.enable = Object.keys(enableMap).filter((name) => enableMap[name])
-      channel.disable = Object.keys(disableMap).filter((name) => disableMap[name])
-      await channel.$update()
+      observed.enable = Object.keys(enableMap).filter((name) => enableMap[name])
+      observed.disable = Object.keys(disableMap).filter((name) => disableMap[name])
+      await observed.$update()
 
       const output: string[] = []
       if (enable.length) output.push(session.text('.enabled', [enable.join(comma)]))
