@@ -1,4 +1,4 @@
-import { Context, deduplicate, noop, Schema, Session } from 'koishi'
+import { Context, deduplicate, Schema, Session } from 'koishi'
 import { } from '@koishijs/plugin-admin'
 import zhCN from './locales/zh-CN.yml'
 
@@ -16,13 +16,15 @@ declare module 'koishi' {
 }
 
 export interface Config {
+  bypassPermissions?: string[]
   mutuallyExclusiveGroups?: string[][]
 }
 
 export const name = 'switch'
 export const using = ['database'] as const
 export const Config: Schema<Config> = Schema.object({
-  mutuallyExclusiveGroups: Schema.array(Schema.array(Schema.string()).role('table')).default([]).description('互斥组'),
+  bypassPermissions: Schema.array(String).role('perms').default([]).description('绕过开关权限检查的权限列表。'),
+  mutuallyExclusiveGroups: Schema.array(Schema.array(Schema.string()).role('table')).default([]).description('互斥组。'),
 })
 
 const leftQuotes = `"'“‘`
@@ -39,7 +41,7 @@ export function apply(ctx: Context, config: Config) {
         Schema.const('aliasOnly').description('仅允许用户使用别名调用'),
         Schema.const('aliasOrAppel').description('允许用户使用别名或称呼调用'),
       ]).role('radio').default('enabled')/* ,
-    ) */.description('默认用户调用方式。'),
+    ) */.description('频道内用户默认调用方式。'),
   }), 900)
 
   ctx.model.extend('channel', {
@@ -51,11 +53,12 @@ export function apply(ctx: Context, config: Config) {
     depends: ({ value }) => [`switch:${value}`],
   })
 
-  ctx.permissions.provide('switch:(value)', ({ value }, session: Partial<Session<any, 'enable' | 'disable'>>) => {
+  ctx.permissions.provide('switch:(value)', async ({ value }, session: Partial<Session<any, 'enable' | 'disable'>>) => {
     if (session.isDirect) return true
     let command = ctx.$commander.get(value)
     // ignore normal command execution
     if (!command || command?.name === session.argv?.command?.name) return true
+    if (config.bypassPermissions?.length && await ctx.permissions.test(config.bypassPermissions, session)) return true
     const { enable = [], disable = [] } = session.channel || {}
     while (command) {
       if (command.config.userCall === 'disabled') {
@@ -73,25 +76,25 @@ export function apply(ctx: Context, config: Config) {
     fields.add('disable')
   })
 
-  ctx.on('attach', (session: Session<never, 'enable' | 'disable'>) => {
+  ctx.on('attach-user', async (session: Session<never, 'enable' | 'disable'>) => {
     if (session.isDirect) return
+    if (config.bypassPermissions?.length && await ctx.permissions.test(config.bypassPermissions, session)) return
     let command = session.argv?.command
     const { enable = [], disable = [] } = session.channel || {}
     while (command) {
       if (command.config.userCall === 'disabled') {
-        if (!enable.includes(command.name)) session.response = noop
+        if (!enable.includes(command.name)) return true
         return
       } else if (disable.includes(command.name)) {
-        session.response = noop
-        return
+        return true
       } else if (command.config.userCall === 'aliasOnly') {
         const [name] = session.stripped.content.toLowerCase().slice(session.stripped.prefix?.length).split(' ', 1)
         const index = leftQuotes.indexOf(name[0]), quote = rightQuotes[index]
-        if (name === command.name || (name.at(-1) === quote && name.slice(1, -1) === command.name)) session.response = noop
+        if (name === command.name || (name.at(-1) === quote && name.slice(1, -1) === command.name)) return true
       } else if (command.config.userCall === 'aliasOrAppel') {
         const [name] = session.stripped.content.toLowerCase().slice(session.stripped.prefix?.length).split(' ', 1)
         const index = leftQuotes.indexOf(name[0]), quote = rightQuotes[index]
-        if ((name === command.name || (name.at(-1) === quote && name.slice(1, -1) === command.name)) && !session.stripped.appel) session.response = noop
+        if ((name === command.name || (name.at(-1) === quote && name.slice(1, -1) === command.name)) && !session.stripped.appel) return true
       }
       command = command.parent
     }

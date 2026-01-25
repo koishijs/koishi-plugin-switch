@@ -4,17 +4,19 @@ import admin from '@koishijs/plugin-admin'
 import * as help from '@koishijs/plugin-help'
 import memory from '@koishijs/plugin-database-memory'
 import mock, { DEFAULT_SELF_ID } from '@koishijs/plugin-mock'
+import assert from 'assert'
 
 const app = new App()
 
-app.plugin(memory)
-app.plugin(mock)
+app.plugin(memory as any)
+app.plugin(mock, { selfId: DEFAULT_SELF_ID })
 app.plugin(admin)
 app.plugin(help)
 
 const client = app.mock.client('123', '321')
 
 app.plugin(_switch, {
+  bypassPermissions: ['switch.bypass'],
   mutuallyExclusiveGroups: [
     ['ex1', 'ex2'],
   ],
@@ -151,5 +153,22 @@ describe('koishi-plugin-switch', () => {
     await client.shouldReply('switch -R', '已重置所有功能。')
     await client.shouldReply('ex1', 'ok')
     await client.shouldNotReply('ex2')
+  })
+
+  it('help integration', async () => {
+    const cmds = ['bar', 'baz', 'alias', 'appel', 'parent']
+    for (const cmd of cmds) {
+      assert.ok((await client.receive('help')).join('\n').includes(cmd), `command ${cmd} should be listed in help`)
+      await client.shouldReply(`switch ${cmd}`, `已禁用 ${cmd} 功能。`)
+      assert.ok(!(await client.receive('help')).join('\n').includes(cmd), `command ${cmd} should not be listed in help`)
+    }
+  })
+
+  it('bypassPermissions', async () => {
+    await app.mock.initUser('234', 1, { permissions: ['switch.bypass'] })
+    await client.shouldReply('switch baz', '已禁用 baz 功能。')
+    const client2 = app.mock.client('234', '321')
+    await client2.shouldReply('baz', 'zab')
+    await client.shouldNotReply('baz')
   })
 })
