@@ -1,6 +1,6 @@
 import { Context, deduplicate, noop, Schema, Session } from 'koishi'
+import { } from '@koishijs/plugin-admin'
 import zhCN from './locales/zh-CN.yml'
-import {} from '@koishijs/plugin-admin'
 
 declare module 'koishi' {
   namespace Command {
@@ -68,8 +68,7 @@ export function apply(ctx: Context, config: Config) {
     return true
   })
 
-  ctx.before('attach-channel', (session, fields) => {
-    if (!session.argv) return
+  ctx.before('command/attach-channel', (argv, fields) => {
     fields.add('enable')
     fields.add('disable')
   })
