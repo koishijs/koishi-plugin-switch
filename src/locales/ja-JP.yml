@@ -1,0 +1,15 @@
+commands:
+  switch:
+    description: コマンドを有効や無効にする
+    messages:
+      forbidden: 您无权修改 {0} 功能。
+      list-enabled: 当前启用的功能有：{0}
+      list-disabled: 当前禁用的功能有：{0}
+      none: 当前没有启用或禁用功能。
+      conflict: 选项冲突。
+      unchanged: 无任何更改。
+      reset-ready: 要重置所有功能，使用-R参数。
+      reset: 已重置所有功能。
+      enabled: 启用 {0} 功能
+      disabled: 禁用 {0} 功能
+      output: 已{0}。
